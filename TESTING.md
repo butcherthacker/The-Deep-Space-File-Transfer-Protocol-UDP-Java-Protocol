@@ -2,7 +2,7 @@
 
 ## Test Files Created
 - **small_send.txt**: 86 bytes (1 DATA packet)
-- **large_send.txt**: 5,093 bytes (~41 DATA packets)
+- **large_send.txt**: 444.72 KB / 0.43 MB (~3,673 DATA packets)
 - **empty_send.txt**: 0 bytes (edge case)
 
 ## Test Configuration
@@ -30,9 +30,9 @@ java Sender 127.0.0.1 1234 4321 <input_file> 1000
 |-----------|----|--------------------|
 | Small (86B) | 0 | ✓ No retransmissions |
 | Small (86B) | 5 | Every 5th ACK dropped, some retransmissions |
-| Large (5KB) | 0 | ✓ All ACKs received |
-| Large (5KB) | 5 | Multiple ACK drops, retransmissions |
-| Large (5KB) | 100 | Rare ACK drops |
+| Large (0.43MB) | 0 | ✓ All ACKs received |
+| Large (0.43MB) | 5 | Multiple ACK drops, retransmissions |
+| Large (0.43MB) | 100 | Rare ACK drops |
 | Empty (0B) | 0 | EOT sent with seq=1 immediately |
 
 ## Test Results
@@ -86,7 +86,7 @@ java Sender 127.0.0.1 1234 4321 ..\large_send.txt 1000
 ```
 
 **Expected:**
-- Packets: SOT + 41 DATA + EOT = 43 packets
+- Packets: SOT + 3,673 DATA + EOT = 3,675 packets
 - No retransmissions
 
 ---
@@ -103,8 +103,8 @@ java Sender 127.0.0.1 1234 4321 ..\large_send.txt 1000
 ```
 
 **Expected:**
-- ACKs dropped at positions: 5, 10, 15, 20, 25, 30, 35, 40
-- Approximately 8-9 retransmissions due to ACK loss
+- ACKs dropped at positions: 5, 10, 15, 20, 25, 30, ... every 5th ACK
+- Approximately 735 retransmissions due to ACK loss (3675/5)
 - File integrity should still be maintained
 
 ---
@@ -145,7 +145,7 @@ Expected result: "FC: no differences encountered"
 |------|-----------|----|--------------|--------------------|----------|--------|
 | 1 | Small (86B) | 0 | 3 | 0 | 0.02 | ✓ PASS |
 | 2 | Small (86B) | 5 | 3 | 0 | TBD | - |
-| 3 | Large (5KB) | 0 | 43 | 0 | TBD | - |
-| 4 | Large (5KB) | 5 | 43 | ~8-9 | TBD | - |
-| 5 | Large (5KB) | 100 | 43 | 0-1 | TBD | - |
+| 3 | Large (0.43MB) | 0 | 3,675 | 0 | TBD | - |
+| 4 | Large (0.43MB) | 5 | 3,675 | ~735 | TBD | - |
+| 5 | Large (0.43MB) | 100 | 3,675 | ~37 | TBD | - |
 | 6 | Empty (0B) | 0 | 2 | 0 | TBD | - |
