@@ -3,6 +3,8 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * DS-FTP Receiver
@@ -74,6 +76,9 @@ public class Receiver {
                 }
             }
 
+            // GBN receive buffer: stores out-of-order DATA payloads keyed by seq number.
+            Map<Integer, byte[]> recvBuffer = new HashMap<>();
+
             // Phase 2: Data Transfer.
             while (!transferComplete) {
                 DatagramPacket receivePacket = new DatagramPacket(buffer, buffer.length);
@@ -92,23 +97,41 @@ public class Receiver {
                         if (packet.getLength() > 0) {
                             fos.write(packet.getPayload());
                         }
-                        
-                        // Send ACK for this packet.
-                        ackCount++;
-                        if (!ChaosEngine.shouldDrop(ackCount, reliabilityNumber)) {
-                            sendAck(socket, senderAddress, senderAckPort, receivedSeq);
-                            System.out.println("Sent ACK (Seq=" + receivedSeq + ")");
-                        } else {
-                            System.out.println("ACK (Seq=" + receivedSeq + ") DROPPED by ChaosEngine");
-                        }
-                        
+
                         // Move to next expected sequence.
                         expectedSeq = (expectedSeq + 1) % 128;
-                        
+
+                        // GBN: drain any consecutively buffered out-of-order packets.
+                        while (recvBuffer.containsKey(expectedSeq)) {
+                            byte[] buffered = recvBuffer.remove(expectedSeq);
+                            if (buffered != null && buffered.length > 0) {
+                                fos.write(buffered);
+                            }
+                            System.out.println("Delivered buffered DATA (Seq=" + expectedSeq + ")");
+                            expectedSeq = (expectedSeq + 1) % 128;
+                        }
+
+                        // Send cumulative ACK for all consecutively delivered packets.
+                        int cumAck = (expectedSeq - 1 + 128) % 128;
+                        ackCount++;
+                        if (!ChaosEngine.shouldDrop(ackCount, reliabilityNumber)) {
+                            sendAck(socket, senderAddress, senderAckPort, cumAck);
+                            System.out.println("Sent ACK (Seq=" + cumAck + ")");
+                        } else {
+                            System.out.println("ACK (Seq=" + cumAck + ") DROPPED by ChaosEngine");
+                        }
+
                     } else {
                         // Duplicate or out-of-order packet.
                         System.out.println("Received duplicate/out-of-order DATA (Seq=" + receivedSeq + ") - Expected " + expectedSeq);
-                        
+
+                        // GBN: buffer if within receive window (forward distance 1..63).
+                        int fwdDist = gbnDistance(expectedSeq, receivedSeq);
+                        if (fwdDist > 0 && fwdDist < 64 && !recvBuffer.containsKey(receivedSeq)) {
+                            recvBuffer.put(receivedSeq, packet.getPayload());
+                            System.out.println("Buffered out-of-order DATA (Seq=" + receivedSeq + ")");
+                        }
+
                         // Resend ACK for last correctly received packet.
                         int lastAckSeq = (expectedSeq - 1 + 128) % 128;
                         ackCount++;
@@ -170,5 +193,13 @@ public class Receiver {
         } catch (IOException e) {
             System.err.println("Failed to send ACK: " + e.getMessage());
         }
+    }
+
+    /**
+     * Returns the modulo-128 forward distance from a to b.
+     * gbnDistance(1,5)=4;  gbnDistance(127,0)=1;  gbnDistance(x,x)=0.
+     */
+    private static int gbnDistance(int a, int b) {
+        return (b - a + 128) % 128;
     }
 }
