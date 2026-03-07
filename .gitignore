@@ -17,6 +17,7 @@ hs_err_pid*
 
 # Output files from tests
 Receiver/output*.txt
+Receiver/out_*.txt
 
 # Cloned starter repo (we have our own copies)
 CP372_DS-FTP/
