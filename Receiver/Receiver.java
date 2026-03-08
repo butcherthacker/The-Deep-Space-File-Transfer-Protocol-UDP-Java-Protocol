@@ -153,11 +153,12 @@ public class Receiver {
                     if (!ChaosEngine.shouldDrop(ackCount, reliabilityNumber)) {
                         sendAck(socket, senderAddress, senderAckPort, receivedSeq);
                         System.out.println("Sent ACK for EOT (Seq=" + receivedSeq + ")");
+                        // Only mark transfer complete when EOT ACK is actually sent
+                        transferComplete = true;
                     } else {
                         System.out.println("ACK for EOT (Seq=" + receivedSeq + ") DROPPED by ChaosEngine");
+                        // Don't exit - wait for EOT retransmission
                     }
-                    
-                    transferComplete = true;
                 }
             }
 
